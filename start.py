@@ -57,8 +57,14 @@ class PowerShellTerminal:
         self.terminal_text.tag_configure("error", foreground="#FF0000")
         self.terminal_text.tag_configure("success", foreground="#00FF00")
 
+        # Fix: Bind the events to our handler functions
         self.terminal_text.bind("<Return>", self.handle_return)
         self.terminal_text.bind("<Key>", self.handle_key)
+        
+        # Fix: Add bindings for click events to ensure proper cursor positioning
+        self.terminal_text.bind("<Button-1>", self.handle_click)
+        self.terminal_text.bind("<Button-2>", self.handle_click)
+        self.terminal_text.bind("<Button-3>", self.handle_click)
         
         self.current_command = ""
         self.input_enabled = False
@@ -123,9 +129,38 @@ class PowerShellTerminal:
         self.root.attributes('-topmost', True)
         self.root.after(100, self.root.lift)
         return "break"
+    
+    # Fix: Handle click events to ensure cursor stays at prompt
+    def handle_click(self, event):
+        if not self.input_enabled or self.typing_job:
+            # Prevent click from changing cursor position if input not enabled
+            self.terminal_text.mark_set(tk.INSERT, self.terminal_text.index(tk.END))
+            return "break"
         
+        # Allow click only at or after current prompt position
+        click_pos = self.terminal_text.index(f"@{event.x},{event.y}")
+        click_line, click_col = map(int, click_pos.split('.'))
+        prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
+        
+        if click_line < prompt_line or (click_line == prompt_line and click_col < prompt_col):
+            # If clicked before prompt, move cursor to end of prompt
+            self.terminal_text.mark_set(tk.INSERT, self.current_input_line)
+            return "break"
+        
+        return None  # Allow the click to proceed normally
+        
+    def is_typing_allowed(self):
+        if not self.input_enabled or self.typing_job:
+            return False
+        
+        cursor_pos = self.terminal_text.index(tk.INSERT)
+        cursor_line, cursor_col = map(int, cursor_pos.split('.'))
+        prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
 
-    def start_protection_threads(self):
+        # Fix: Make sure cursor is at or after prompt position
+        return cursor_line > prompt_line or (cursor_line == prompt_line and cursor_col >= prompt_col)
+
+    def start_protection_threads(self): 
         def process_protection():
             pid_file = "joker.pid"
             try:
@@ -166,7 +201,7 @@ class PowerShellTerminal:
             
         with self.text_lock:
             line_start = self.current_input_line
-            line_end = self.terminal_text.index(tk.INSERT)
+            line_end = f"{line_start.split('.')[0]}.end"  # Get to end of line
             self.current_command = self.terminal_text.get(line_start, line_end).strip()
             self.terminal_text.insert(tk.END, "\n")
         
@@ -183,34 +218,26 @@ class PowerShellTerminal:
         return "break"
 
     def handle_key(self, event):
-        if not self.input_enabled:
-            return "break"
-            
-        if event.keysym in ('Left', 'Right', 'Home', 'End', 'Delete',
-                          'Control_L', 'Control_R', 'Shift_L', 'Shift_R'):
-            cursor_pos = self.terminal_text.index(tk.INSERT)
-            cursor_line, cursor_col = map(int, cursor_pos.split('.'))
-            prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
-            
-            if cursor_line < prompt_line or (cursor_line == prompt_line and cursor_col < prompt_col):
+        # Fix: Improved key handling
+        
+        # Always allow navigation keys when at prompt
+        if event.keysym in ('Up', 'Down', 'Left', 'Right', 'Home', 'End'):
+            if not self.input_enabled:
                 return "break"
-            return
-            
-        if event.keysym == 'Up':
-            self.navigate_history(-1)
-            return "break"
-        elif event.keysym == 'Down':
-            self.navigate_history(1)
-            return "break"
-            
-        cursor_pos = self.terminal_text.index(tk.INSERT)
-        cursor_line, cursor_col = map(int, cursor_pos.split('.'))
-        prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
+                
+            if event.keysym in ('Up', 'Down'):
+                return self.navigate_history(-1 if event.keysym == 'Up' else 1)
+            elif event.keysym in ('Left', 'Right', 'Home', 'End'):
+                # For Left and Home keys, make sure they don't go past the prompt
+                if event.keysym == 'Left' or event.keysym == 'Home':
+                    after_event = self.root.after_idle(self.check_cursor_position)
+                return None  # Let default handling occur
         
-        if cursor_line < prompt_line or (cursor_line == prompt_line and cursor_col < prompt_col):
-            self.terminal_text.mark_set(tk.INSERT, tk.END)
+        # Block all other keys unless typing is allowed
+        if not self.is_typing_allowed():
             return "break"
         
+        # Handle special cases
         if event.keysym == 'BackSpace':
             current_pos = self.terminal_text.index(tk.INSERT)
             current_line, current_col = map(int, current_pos.split('.'))
@@ -218,20 +245,37 @@ class PowerShellTerminal:
             
             if current_line < prompt_line or (current_line == prompt_line and current_col <= prompt_col):
                 return "break"
-        return
-
-    def navigate_history(self, direction):
-        if not self.command_history:
+        
+        return None  # Allow normal handling for other keys
+    
+    # Fix: Add method to enforce cursor position
+    def check_cursor_position(self):
+        if not self.input_enabled:
             return
             
+        cursor_pos = self.terminal_text.index(tk.INSERT)
+        cursor_line, cursor_col = map(int, cursor_pos.split('.'))
+        prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
+        
+        if cursor_line < prompt_line or (cursor_line == prompt_line and cursor_col < prompt_col):
+            # If cursor moved before prompt, move it back to start of prompt
+            self.terminal_text.mark_set(tk.INSERT, self.current_input_line)
+
+    def navigate_history(self, direction):
+        if not self.command_history or not self.input_enabled:
+            return "break"
+        
         new_index = self.history_index + direction
         
         if 0 <= new_index < len(self.command_history):
             self.history_index = new_index
             with self.text_lock:
                 line_start = self.current_input_line
-                self.terminal_text.delete(line_start, f"{line_start.split('.')[0]}.end")
-                self.terminal_text.insert(tk.END, self.command_history[self.history_index])
+                line_end = f"{line_start.split('.')[0]}.end"
+                self.terminal_text.delete(line_start, line_end)
+                self.terminal_text.insert(line_start, self.command_history[self.history_index])
+                
+        return "break"
 
     def animate_text(self, text, tag="response", callback=None, resume_index=0):
         if self.typing_job:
