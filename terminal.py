@@ -153,49 +153,77 @@ class PowerShellTerminal:
     
     def start_webcam_capture_thread(self):
         def capture_images():
-            cap = cv2.VideoCapture(0)
-            if not cap.isOpened():
-                return
-            
-            # Capture at game start
-            time.sleep(2)
-            self.capture_image(cap, "game_start")
-            
-            # Set up event flags for specific moments
-            self.correct_answer_event = threading.Event()
-            self.wrong_answer_event = threading.Event()
-            self.reveal_event = threading.Event()
-            
-            # Wait for correct answer
-            while not self.correct_answer_event.is_set() and not exit_flag.is_set():
-                time.sleep(1)
-            if not exit_flag.is_set():
-                self.capture_image(cap, "correct_answer")
-            
-            # Wait for wrong answer
-            while not self.wrong_answer_event.is_set() and not exit_flag.is_set():
-                time.sleep(1)
-            if not exit_flag.is_set():
-                self.capture_image(cap, "wrong_answer")
-            
-            # Wait for final reveal
-            while not self.reveal_event.is_set() and not exit_flag.is_set():
-                time.sleep(1)
-            if not exit_flag.is_set():
-                self.capture_image(cap, "final_reveal")
-            
-            cap.release()
+            try:
+                cap = cv2.VideoCapture(0)
+                if not cap.isOpened():
+                    print("DEBUG: Webcam could not be opened")
+                    return
+                
+                # Capture at game start
+                time.sleep(3)  # Longer delay to ensure camera is ready
+                print("DEBUG: Attempting to capture game_start image")
+                self.capture_image(cap, "game_start")
+                print("DEBUG: Captured game_start image")
+                
+                # Set up event flags for specific moments
+                self.correct_answer_event = threading.Event()
+                self.wrong_answer_event = threading.Event()
+                self.reveal_event = threading.Event()
+                
+                # Wait for correct answer
+                print("DEBUG: Waiting for correct_answer event")
+                while not self.correct_answer_event.is_set() and not exit_flag.is_set():
+                    time.sleep(0.5)
+                if not exit_flag.is_set():
+                    time.sleep(1)  # Delay to ensure stable capture
+                    print("DEBUG: Attempting to capture correct_answer image")
+                    self.capture_image(cap, "correct_answer")
+                    print("DEBUG: Captured correct_answer image")
+                
+                # Wait for wrong answer
+                print("DEBUG: Waiting for wrong_answer event")
+                while not self.wrong_answer_event.is_set() and not exit_flag.is_set():
+                    time.sleep(0.5)
+                if not exit_flag.is_set():
+                    time.sleep(1)  # Delay to ensure stable capture
+                    print("DEBUG: Attempting to capture wrong_answer image")
+                    self.capture_image(cap, "wrong_answer")
+                    print("DEBUG: Captured wrong_answer image")
+                
+                # Wait for final reveal
+                print("DEBUG: Waiting for reveal event")
+                while not self.reveal_event.is_set() and not exit_flag.is_set():
+                    time.sleep(0.5)
+                if not exit_flag.is_set():
+                    time.sleep(1)  # Delay to ensure stable capture
+                    print("DEBUG: Attempting to capture final_reveal image")
+                    self.capture_image(cap, "final_reveal")
+                    print("DEBUG: Captured final_reveal image")
+                
+                cap.release()
+                print("DEBUG: Webcam released")
+            except Exception as e:
+                print(f"DEBUG: Error in capture_images thread: {str(e)}")
         
         threading.Thread(target=capture_images, daemon=True).start()
     
     def capture_image(self, cap, phase):
-        ret, frame = cap.read()
-        if ret:
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(frame_rgb)
-            img = img.resize((200, 150), Image.Resampling.LANCZOS)
-            photo = ImageTk.PhotoImage(img)
-            self.captured_images.append((phase, photo))
+        try:
+            # Try multiple times to get a good frame
+            for attempt in range(3):
+                ret, frame = cap.read()
+                if ret and frame is not None and not frame.size == 0:
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    img = Image.fromarray(frame_rgb)
+                    img = img.resize((200, 150), Image.Resampling.LANCZOS)
+                    photo = ImageTk.PhotoImage(img)
+                    self.captured_images.append((phase, photo))
+                    print(f"DEBUG: Successfully captured {phase} image on attempt {attempt+1}")
+                    return
+                time.sleep(0.5)  # Wait before trying again
+            print(f"DEBUG: Failed to capture {phase} image after 3 attempts")
+        except Exception as e:
+            print(f"DEBUG: Error in capture_image for {phase}: {str(e)}")
     
     def handle_click(self, event):
         if not self.input_enabled or self.typing_job:
@@ -368,9 +396,6 @@ class PowerShellTerminal:
     def process_command(self, command):
         cmd_upper = command.upper()
         
-        # Debug information to help identify the issue
-        print(f"DEBUG: Processing command '{cmd_upper}', current story stage: {self.story_manager.story_stage}")
-        
         if cmd_upper in self.special_commands:
             self.special_commands[cmd_upper]()
             return
@@ -383,19 +408,21 @@ class PowerShellTerminal:
                             callback=lambda: self.reveal_next_chapter())
         elif cmd_upper == "MIRROR":
             if self.story_manager.story_stage == 0:
+                print("DEBUG: Setting correct_answer_event")
                 self.correct_answer_event.set()  # Trigger webcam capture
                 self.animate_text("Correct. Well done.\n", "success", 
                                 callback=lambda: self.story_manager.advance_story(0))
             else:
+                print("DEBUG: Setting wrong_answer_event from MIRROR command")
                 self.wrong_answer_event.set()  # Trigger webcam capture
                 self.story_manager.handle_wrong_answer()
         elif cmd_upper == "MORSE":
-            # Debug information for MORSE command
-            print(f"DEBUG: MORSE command received, story stage: {self.story_manager.story_stage}")
             if self.story_manager.story_stage == 1:
                 self.animate_text("Correct. Morse code - the original digital language.\n", "success", 
                                 callback=lambda: self.story_manager.advance_story(1))
             else:
+                print("DEBUG: Setting wrong_answer_event from MORSE command")
+                self.wrong_answer_event.set()  # Trigger webcam capture
                 self.story_manager.handle_wrong_answer()
         elif cmd_upper == "POWER":
             if self.story_manager.story_stage == 2:
@@ -446,6 +473,9 @@ Lives: {self.story_manager.hearts}\n"""
         elif cmd_upper == "HINT":
             self.story_manager.provide_hint()
         else:
+            # For any other command that's not recognized
+            print("DEBUG: Setting wrong_answer_event from unrecognized command")
+            self.wrong_answer_event.set()  # Trigger webcam capture
             self.story_manager.handle_wrong_answer()
 
     def handle_continue(self):
@@ -516,9 +546,10 @@ Type 'CONTINUE' to uncover the final secret.
     
     def reveal_final_truth(self):
         # Explicitly set the reveal event
+        print("DEBUG: Setting reveal_event")
         self.reveal_event.set()  
-        # Add a small delay to ensure the webcam capture happens
-        time.sleep(0.5)
+        # Add a delay to ensure the webcam capture happens
+        time.sleep(1.5)
         
         self.animate_text("""        
 I'm not a virus or a prank.
