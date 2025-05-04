@@ -58,8 +58,11 @@ class StoryManager:
     
     def advance_story(self, stage):
         """Advance the story to a specific stage"""
-        self.terminal.user_stats.log_stage_complete(self.story_stage)
-        self.story_stage = stage
+        # Log stage completion
+        self.terminal.user_stats.log_stage_complete(stage)
+        
+        # Explicitly update the story stage based on the current stage
+        self.story_stage = stage + 1
         
         story_segments = {
             0: f"""

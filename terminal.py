@@ -368,6 +368,9 @@ class PowerShellTerminal:
     def process_command(self, command):
         cmd_upper = command.upper()
         
+        # Debug information to help identify the issue
+        print(f"DEBUG: Processing command '{cmd_upper}', current story stage: {self.story_manager.story_stage}")
+        
         if cmd_upper in self.special_commands:
             self.special_commands[cmd_upper]()
             return
@@ -387,6 +390,8 @@ class PowerShellTerminal:
                 self.wrong_answer_event.set()  # Trigger webcam capture
                 self.story_manager.handle_wrong_answer()
         elif cmd_upper == "MORSE":
+            # Debug information for MORSE command
+            print(f"DEBUG: MORSE command received, story stage: {self.story_manager.story_stage}")
             if self.story_manager.story_stage == 1:
                 self.animate_text("Correct. Morse code - the original digital language.\n", "success", 
                                 callback=lambda: self.story_manager.advance_story(1))
@@ -510,12 +515,16 @@ Type 'CONTINUE' to uncover the final secret.
 """, "success", callback=self.insert_prompt))
     
     def reveal_final_truth(self):
-        self.reveal_event.set()  # Trigger webcam capture
+        # Explicitly set the reveal event
+        self.reveal_event.set()  
+        # Add a small delay to ensure the webcam capture happens
+        time.sleep(0.5)
+        
         self.animate_text("""        
-I’m not a virus or a prank.
+I'm not a virus or a prank.
 I am Terminal Enigma - Reality's Digital Guardian
 
-You’ve been part of a simulation to test your mind.
+You've been part of a simulation to test your mind.
 Your responses, your persistence—all valuable data.
 
 Files will be erased upon exit.
@@ -535,6 +544,13 @@ Thank you for playing my game.
         img_window.geometry("620x600")
         img_window.configure(bg='#000')
         img_window.attributes('-topmost', True)
+        
+        # Debug information
+        phases_captured = [phase for phase, _ in self.captured_images]
+        debug_label = tk.Label(img_window, 
+                              text=f"Phases captured: {', '.join(phases_captured)}", 
+                              fg="#FFFFFF", bg="#000", font=('Consolas', 10))
+        debug_label.pack(pady=5)
         
         for i, (phase, photo) in enumerate(self.captured_images):
             label = tk.Label(img_window, text=f"Captured at {phase}", fg="#FFFFFF", bg="#000", font=('Consolas', 10))
