@@ -112,10 +112,10 @@ class PowerShellTerminal:
                 self.insert_prompt()
 
         if self.close_attempts == 1:
-            message = "You cannot escape me that easily. Try again and face the consequences.\n"
+            message = "You can't escape me that easily. Try again and face the consequences.\n"
             self.animate_text(message, "error", callback=resume_previous_message)
         elif self.close_attempts == 2:
-            message = "I warned you once.\n"
+            message = "I warned you once :)\n"
             self.animate_text(message, "error", callback=lambda: self.capture_and_show_webcam_image(callback=resume_previous_message))
         elif self.close_attempts == 3:
             message = "This is your final warning. I’m tracing you now. Next time, you’re done.\n"
@@ -235,8 +235,12 @@ class PowerShellTerminal:
         prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
         
         if click_line < prompt_line or (click_line == prompt_line and click_col < prompt_col):
-            self.terminal_text.mark_set(tk.INSERT, self.current_input_line)
-            return "break"
+            # Allow selection for copying, but don't move cursor for editing
+            if event.state & 0x1:  # Check if Shift key is pressed (for selection)
+                return None
+            else:
+                self.terminal_text.mark_set(tk.INSERT, self.current_input_line)
+                return "break"
         
         return None
         
@@ -321,6 +325,26 @@ class PowerShellTerminal:
         
         if not self.is_typing_allowed():
             return "break"
+        
+        # Check if there's a text selection
+        try:
+            sel_start = self.terminal_text.index("sel.first")
+            sel_end = self.terminal_text.index("sel.last")
+            
+            # If selection exists, check if it includes text before the prompt
+            prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
+            sel_start_line, sel_start_col = map(int, sel_start.split('.'))
+            
+            if sel_start_line < prompt_line or (sel_start_line == prompt_line and sel_start_col < prompt_col):
+                # Selection includes text before the prompt, prevent modification
+                if event.keysym in ('BackSpace', 'Delete') or event.char:
+                    # Clear the selection and move cursor to input position
+                    self.terminal_text.tag_remove("sel", "1.0", "end")
+                    self.terminal_text.mark_set(tk.INSERT, self.current_input_line)
+                    return "break"
+        except:
+            # No selection exists
+            pass
         
         if event.keysym == 'BackSpace':
             current_pos = self.terminal_text.index(tk.INSERT)
@@ -410,36 +434,42 @@ class PowerShellTerminal:
             if self.story_manager.story_stage == 0:
                 print("DEBUG: Setting correct_answer_event")
                 self.correct_answer_event.set()  # Trigger webcam capture
-                self.animate_text("Correct. Well done.\n", "success", 
+                self.animate_text("", "success", 
                                 callback=lambda: self.story_manager.advance_story(0))
             else:
                 print("DEBUG: Setting wrong_answer_event from MIRROR command")
                 self.wrong_answer_event.set()  # Trigger webcam capture
                 self.story_manager.handle_wrong_answer()
-        elif cmd_upper == "MORSE":
+        elif cmd_upper == "NAME":
             if self.story_manager.story_stage == 1:
-                self.animate_text("Correct. Morse code - the original digital language.\n", "success", 
+                self.animate_text("", "success", 
                                 callback=lambda: self.story_manager.advance_story(1))
             else:
-                print("DEBUG: Setting wrong_answer_event from MORSE command")
+                print("DEBUG: Setting wrong_answer_event from NAME command")
                 self.wrong_answer_event.set()  # Trigger webcam capture
                 self.story_manager.handle_wrong_answer()
-        elif cmd_upper == "POWER":
+        elif cmd_upper == "MASK":
             if self.story_manager.story_stage == 2:
-                self.animate_text("Power - the lifeblood of technology. Well done.\n", "success", 
+                self.animate_text("", "success", 
                                 callback=lambda: self.story_manager.advance_story(2))
             else:
                 self.story_manager.handle_wrong_answer()
-        elif cmd_upper == "DECRYPT_FIREWALL":
+        elif cmd_upper == "MEMORY":
             if self.story_manager.story_stage == 3:
-                self.animate_text("Firewall decryption initiated. Access granted.\n", "success",
+                self.animate_text("", "success",
                                 callback=lambda: self.story_manager.advance_story(3))
             else:
                 self.story_manager.handle_wrong_answer()
-        elif cmd_upper == "SILENCE":
+        elif cmd_upper == "CHOICE":
             if self.story_manager.story_stage == 4:
-                self.animate_text("Silence - the absence of signal. You've reached the final barrier.\n", "success",
+                self.animate_text("", "success",
                                 callback=lambda: self.story_manager.advance_story(4))
+            else:
+                self.story_manager.handle_wrong_answer()
+        elif cmd_upper == "SHADOW":
+            if self.story_manager.story_stage == 5:
+                self.animate_text("", "success",
+                                callback=lambda: self.story_manager.advance_story(5))
             else:
                 self.story_manager.handle_wrong_answer()
         elif cmd_upper == "HELP":
@@ -456,7 +486,6 @@ Available Commands:
   story          - View your progress
   hint           - Request a hint
   EXITNOW        - Exit safely
-  LORMA          - Advance the story
 
 Current Riddle: {current_riddle}
 Lives: {self.story_manager.hearts}\n"""
@@ -479,8 +508,15 @@ Lives: {self.story_manager.hearts}\n"""
             self.story_manager.handle_wrong_answer()
 
     def handle_continue(self):
+        # Debug the current story stage
+        print(f"DEBUG: handle_continue called, story_stage = {self.story_manager.story_stage}")
+        
+        # Check if we're in the transition phase after KILL_CODE
         if self.story_manager.story_stage == -1:
             self.reveal_final_truth()
+        elif self.story_manager.story_stage >= 0:  # Allow CONTINUE to work at any positive story stage
+            self.animate_text("Entering the next phase...\n", "success", 
+                            callback=lambda: self.story_manager.advance_story(self.story_manager.story_stage))
         else:
             self.animate_text("That command doesn't work here. Try something else.\n", "error", callback=self.insert_prompt)
 
@@ -672,7 +708,7 @@ Let's see what happens if you choose this option. Your filthy secret remains pri
 
 Let’s begin.
 
-First one: I show you yourself, but I’m not you. What am I?
+First one: If you drop me I'm sure to crack, but give me a smile and I'll always smile back. What am I?
 
 Lives: 3 | Type 'help' for commands
 """
