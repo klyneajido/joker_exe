@@ -133,7 +133,7 @@ class UserStats:
         adaptability = self.get_adaptability_score()
         
         overall_score = (persistence + efficiency + curiosity + adaptability) / 4
-        percentile = min(99, max(1, int(overall_score * 10)))
+       
         
         report = f"""
 Simulation Results:
@@ -154,7 +154,6 @@ Adaptability: {adaptability:.1f}/10
 
 {self.get_emotion_summary()}
 
-You rank in the top {percentile}% of participants.
 """
         if self.time_per_stage:
             report += "\nStage Completion Times:\n"
