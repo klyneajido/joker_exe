@@ -102,7 +102,7 @@ class PowerShellTerminal:
         
         current_message = self.current_message
         current_tag = self.current_tag
-        current_callback = self.current_callback.material
+        current_callback = self.current_callback
         current_index = self.current_index
         
         def resume_previous_message():
@@ -156,16 +156,34 @@ class PowerShellTerminal:
             cap = cv2.VideoCapture(0)
             if not cap.isOpened():
                 return
+            
+            # Capture at game start
             time.sleep(2)
-            self.capture_image(cap, "start")
-            while self.story_stage < 2 and not exit_flag.is_set():
-                time.sleep(5)
+            self.capture_image(cap, "game_start")
+            
+            # Set up event flags for specific moments
+            self.correct_answer_event = threading.Event()
+            self.wrong_answer_event = threading.Event()
+            self.reveal_event = threading.Event()
+            
+            # Wait for correct answer
+            while not self.correct_answer_event.is_set() and not exit_flag.is_set():
+                time.sleep(1)
             if not exit_flag.is_set():
-                self.capture_image(cap, "middle")
-            while self.story_stage < 5 and not exit_flag.is_set():
-                time.sleep(5)
+                self.capture_image(cap, "correct_answer")
+            
+            # Wait for wrong answer
+            while not self.wrong_answer_event.is_set() and not exit_flag.is_set():
+                time.sleep(1)
             if not exit_flag.is_set():
-                self.capture_image(cap, "end")
+                self.capture_image(cap, "wrong_answer")
+            
+            # Wait for final reveal
+            while not self.reveal_event.is_set() and not exit_flag.is_set():
+                time.sleep(1)
+            if not exit_flag.is_set():
+                self.capture_image(cap, "final_reveal")
+            
             cap.release()
         
         threading.Thread(target=capture_images, daemon=True).start()
@@ -362,9 +380,11 @@ class PowerShellTerminal:
                             callback=lambda: self.reveal_next_chapter())
         elif cmd_upper == "MIRROR":
             if self.story_manager.story_stage == 0:
+                self.correct_answer_event.set()  # Trigger webcam capture
                 self.animate_text("Correct. Well done.\n", "success", 
                                 callback=lambda: self.story_manager.advance_story(0))
             else:
+                self.wrong_answer_event.set()  # Trigger webcam capture
                 self.story_manager.handle_wrong_answer()
         elif cmd_upper == "MORSE":
             if self.story_manager.story_stage == 1:
@@ -490,6 +510,7 @@ Type 'CONTINUE' to uncover the final secret.
 """, "success", callback=self.insert_prompt))
     
     def reveal_final_truth(self):
+        self.reveal_event.set()  # Trigger webcam capture
         self.animate_text("""        
 I’m not a virus or a prank.
 I am Terminal Enigma - Reality's Digital Guardian
