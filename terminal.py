@@ -12,6 +12,8 @@ import winsound
 from PIL import Image, ImageTk
 from user_stats import UserStats
 from story_manager import StoryManager
+from deepface import DeepFace
+import numpy as np
 
 SAFE_WORD = "EXITNOW"
 KILL_CODE = "LORMA"
@@ -145,10 +147,8 @@ class PowerShellTerminal:
         retrieval_window.configure(bg='#000')
         retrieval_window.attributes('-topmost', True)
         
-        # Add a red border to make it look more alarming
         retrieval_window.configure(highlightbackground="red", highlightcolor="red", highlightthickness=2)
         
-        # Create a flashing effect
         def flash_window():
             current_bg = retrieval_window.cget("bg")
             new_bg = "#300" if current_bg == "#000" else "#000"
@@ -156,10 +156,8 @@ class PowerShellTerminal:
             if retrieval_window.winfo_exists():
                 retrieval_window.after(300, flash_window)
         
-        # Start flashing
         flash_window()
         
-        # Get real IP and hostname for added realism
         import socket
         try:
             hostname = socket.gethostname()
@@ -168,11 +166,9 @@ class PowerShellTerminal:
             hostname = "UNKNOWN"
             ip = "192.168.x.x"
         
-        # Generate a fake but realistic-looking MAC address
         import random
         mac = ":".join([f"{random.randint(0, 255):02x}" for _ in range(6)])
         
-        # Create a header with warning icon
         header_label = tk.Label(
             retrieval_window, 
             text="⚠ UNAUTHORIZED ACCESS DETECTED ⚠",
@@ -182,7 +178,6 @@ class PowerShellTerminal:
         )
         header_label.pack(pady=(10, 5))
         
-        # Create a progress bar
         progress_frame = tk.Frame(retrieval_window, bg="#000")
         progress_frame.pack(fill=tk.X, padx=20, pady=10)
         
@@ -197,7 +192,6 @@ class PowerShellTerminal:
         )
         progress_bar.pack()
         
-        # Animate the progress bar
         def update_progress(value=0):
             if value <= 100:
                 progress_bar.delete("progress")
@@ -209,7 +203,6 @@ class PowerShellTerminal:
                 )
                 progress_var.set(value)
                 
-                # Update status text based on progress
                 if value < 30:
                     status_label.config(text=f"Accessing system files... {value}%")
                 elif value < 60:
@@ -225,12 +218,10 @@ class PowerShellTerminal:
                 status_label.config(text="Remote access established")
                 data_label.config(text=f"HOST: {hostname}\nIP: {ip}\nMAC: {mac}\nUSER: {os.getlogin()}\nACCESS: FULL CONTROL")
                 
-                # Play a beep when complete
                 if platform.system() == "Windows":
                     winsound.Beep(800, 200)
                     winsound.Beep(600, 200)
         
-        # Status label that changes with progress
         status_label = tk.Label(
             retrieval_window, 
             text="Initializing connection...", 
@@ -240,7 +231,6 @@ class PowerShellTerminal:
         )
         status_label.pack(pady=5)
         
-        # Data display that updates when "complete"
         data_label = tk.Label(
             retrieval_window, 
             text="SCANNING SYSTEM...", 
@@ -251,10 +241,8 @@ class PowerShellTerminal:
         )
         data_label.pack(pady=10)
         
-        # Start the progress animation
         update_progress()
         
-        # Add a countdown timer
         countdown_label = tk.Label(
             retrieval_window, 
             text="Window closing in 5s", 
@@ -270,20 +258,16 @@ class PowerShellTerminal:
                 if retrieval_window.winfo_exists():
                     retrieval_window.after(1000, update_countdown, seconds - 1)
         
-        # Start the countdown
         update_countdown()
         
-        # Try to log this event, but don't fail if the method doesn't exist
         try:
             if hasattr(self.user_stats, 'log_event'):
                 self.user_stats.log_event('fake_retrieval_shown')
             else:
-                # Increment close attempts as a fallback
                 self.user_stats.close_attempts += 1
         except Exception as e:
             print(f"Error logging event: {str(e)}")
         
-        # Close the window after 5 seconds
         self.root.after(5000, retrieval_window.destroy)
     
     def start_webcam_capture_thread(self):
@@ -294,43 +278,53 @@ class PowerShellTerminal:
                     print("DEBUG: Webcam could not be opened")
                     return
                 
-                # Capture at game start
-                time.sleep(3)  # Longer delay to ensure camera is ready
+                time.sleep(3)
                 print("DEBUG: Attempting to capture game_start image")
                 self.capture_image(cap, "game_start")
                 print("DEBUG: Captured game_start image")
                 
-                # Set up event flags for specific moments
                 self.correct_answer_event = threading.Event()
                 self.wrong_answer_event = threading.Event()
                 self.reveal_event = threading.Event()
                 
-                # Wait for correct answer
                 print("DEBUG: Waiting for correct_answer event")
                 while not self.correct_answer_event.is_set() and not exit_flag.is_set():
+                    ret, frame = cap.read()
+                    if ret and frame is not None and not frame.size == 0:
+                        emotion = self.detect_emotion(frame)
+                        if emotion:
+                            self.user_stats.log_emotion(emotion)
                     time.sleep(0.5)
                 if not exit_flag.is_set():
-                    time.sleep(1)  # Delay to ensure stable capture
+                    time.sleep(1)
                     print("DEBUG: Attempting to capture correct_answer image")
                     self.capture_image(cap, "correct_answer")
                     print("DEBUG: Captured correct_answer image")
                 
-                # Wait for wrong answer
                 print("DEBUG: Waiting for wrong_answer event")
                 while not self.wrong_answer_event.is_set() and not exit_flag.is_set():
+                    ret, frame = cap.read()
+                    if ret and frame is not None and not frame.size == 0:
+                        emotion = self.detect_emotion(frame)
+                        if emotion:
+                            self.user_stats.log_emotion(emotion)
                     time.sleep(0.5)
                 if not exit_flag.is_set():
-                    time.sleep(1)  # Delay to ensure stable capture
+                    time.sleep(1)
                     print("DEBUG: Attempting to capture wrong_answer image")
                     self.capture_image(cap, "wrong_answer")
                     print("DEBUG: Captured wrong_answer image")
                 
-                # Wait for final reveal
                 print("DEBUG: Waiting for reveal event")
                 while not self.reveal_event.is_set() and not exit_flag.is_set():
+                    ret, frame = cap.read()
+                    if ret and frame is not None and not frame.size == 0:
+                        emotion = self.detect_emotion(frame)
+                        if emotion:
+                            self.user_stats.log_emotion(emotion)
                     time.sleep(0.5)
                 if not exit_flag.is_set():
-                    time.sleep(1)  # Delay to ensure stable capture
+                    time.sleep(1)
                     print("DEBUG: Attempting to capture final_reveal image")
                     self.capture_image(cap, "final_reveal")
                     print("DEBUG: Captured final_reveal image")
@@ -342,9 +336,19 @@ class PowerShellTerminal:
         
         threading.Thread(target=capture_images, daemon=True).start()
     
+    def detect_emotion(self, frame):
+        try:
+            result = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
+            if isinstance(result, list):
+                result = result[0]
+            dominant_emotion = result.get('dominant_emotion')
+            return dominant_emotion
+        except Exception as e:
+            print(f"DEBUG: Error in emotion detection: {str(e)}")
+            return None
+    
     def capture_image(self, cap, phase):
         try:
-            # Try multiple times to get a good frame
             for attempt in range(3):
                 ret, frame = cap.read()
                 if ret and frame is not None and not frame.size == 0:
@@ -353,9 +357,12 @@ class PowerShellTerminal:
                     img = img.resize((200, 150), Image.Resampling.LANCZOS)
                     photo = ImageTk.PhotoImage(img)
                     self.captured_images.append((phase, photo))
+                    emotion = self.detect_emotion(frame)
+                    if emotion:
+                        self.user_stats.log_emotion(emotion)
                     print(f"DEBUG: Successfully captured {phase} image on attempt {attempt+1}")
                     return
-                time.sleep(0.5)  # Wait before trying again
+                time.sleep(0.5)
             print(f"DEBUG: Failed to capture {phase} image after 3 attempts")
         except Exception as e:
             print(f"DEBUG: Error in capture_image for {phase}: {str(e)}")
@@ -370,8 +377,7 @@ class PowerShellTerminal:
         prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
         
         if click_line < prompt_line or (click_line == prompt_line and click_col < prompt_col):
-            # Allow selection for copying, but don't move cursor for editing
-            if event.state & 0x1:  # Check if Shift key is pressed (for selection)
+            if event.state & 0x1:
                 return None
             else:
                 self.terminal_text.mark_set(tk.INSERT, self.current_input_line)
@@ -381,6 +387,7 @@ class PowerShellTerminal:
         
     def is_typing_allowed(self):
         if not self.input_enabled or self.typing_job:
+            story_manager.py
             return False
         
         cursor_pos = self.terminal_text.index(tk.INSERT)
@@ -461,24 +468,19 @@ class PowerShellTerminal:
         if not self.is_typing_allowed():
             return "break"
         
-        # Check if there's a text selection
         try:
             sel_start = self.terminal_text.index("sel.first")
             sel_end = self.terminal_text.index("sel.last")
             
-            # If selection exists, check if it includes text before the prompt
             prompt_line, prompt_col = map(int, self.current_input_line.split('.'))
             sel_start_line, sel_start_col = map(int, sel_start.split('.'))
             
             if sel_start_line < prompt_line or (sel_start_line == prompt_line and sel_start_col < prompt_col):
-                # Selection includes text before the prompt, prevent modification
                 if event.keysym in ('BackSpace', 'Delete') or event.char:
-                    # Clear the selection and move cursor to input position
                     self.terminal_text.tag_remove("sel", "1.0", "end")
                     self.terminal_text.mark_set(tk.INSERT, self.current_input_line)
                     return "break"
         except:
-            # No selection exists
             pass
         
         if event.keysym == 'BackSpace':
@@ -568,12 +570,12 @@ class PowerShellTerminal:
         elif cmd_upper == "MIRROR":
             if self.story_manager.story_stage == 0:
                 print("DEBUG: Setting correct_answer_event")
-                self.correct_answer_event.set()  # Trigger webcam capture
+                self.correct_answer_event.set()
                 self.animate_text("", "success", 
                                 callback=lambda: self.story_manager.advance_story(0))
             else:
                 print("DEBUG: Setting wrong_answer_event from MIRROR command")
-                self.wrong_answer_event.set()  # Trigger webcam capture
+                self.wrong_answer_event.set()
                 self.story_manager.handle_wrong_answer()
         elif cmd_upper == "NAME":
             if self.story_manager.story_stage == 1:
@@ -581,7 +583,7 @@ class PowerShellTerminal:
                                 callback=lambda: self.story_manager.advance_story(1))
             else:
                 print("DEBUG: Setting wrong_answer_event from NAME command")
-                self.wrong_answer_event.set()  # Trigger webcam capture
+                self.wrong_answer_event.set()
                 self.story_manager.handle_wrong_answer()
         elif cmd_upper == "MASK":
             if self.story_manager.story_stage == 2:
@@ -637,19 +639,16 @@ Lives: {self.story_manager.hearts}\n"""
         elif cmd_upper == "HINT":
             self.story_manager.provide_hint()
         else:
-            # For any other command that's not recognized
             print("DEBUG: Setting wrong_answer_event from unrecognized command")
-            self.wrong_answer_event.set()  # Trigger webcam capture
+            self.wrong_answer_event.set()
             self.story_manager.handle_wrong_answer()
 
     def handle_continue(self):
-        # Debug the current story stage
         print(f"DEBUG: handle_continue called, story_stage = {self.story_manager.story_stage}")
         
-        # Check if we're in the transition phase after KILL_CODE
         if self.story_manager.story_stage == -1:
             self.reveal_final_truth()
-        elif self.story_manager.story_stage >= 0:  # Allow CONTINUE to work at any positive story stage
+        elif self.story_manager.story_stage >= 0:
             self.animate_text("Entering the next phase...\n", "success", 
                             callback=lambda: self.story_manager.advance_story(self.story_manager.story_stage))
         else:
@@ -678,6 +677,10 @@ Lives: {self.story_manager.hearts}\n"""
                 label = tk.Label(img_window, image=photo)
                 label.image = photo
                 label.pack()
+                
+                emotion = self.detect_emotion(frame)
+                if emotion:
+                    self.user_stats.log_emotion(emotion)
                 
                 self.root.after(3000, lambda: [img_window.destroy(), callback() if callback else self.insert_prompt()])
                 
@@ -716,10 +719,8 @@ Type 'CONTINUE' to uncover the final secret.
 """, "success", callback=self.insert_prompt))
     
     def reveal_final_truth(self):
-        # Explicitly set the reveal event
         print("DEBUG: Setting reveal_event")
-        self.reveal_event.set()  
-        # Add a delay to ensure the webcam capture happens
+        self.reveal_event.set()
         time.sleep(1.5)
         
         self.animate_text("""        
@@ -747,7 +748,6 @@ Thank you for playing my game.
         img_window.configure(bg='#000')
         img_window.attributes('-topmost', True)
         
-        # Debug information
         phases_captured = [phase for phase, _ in self.captured_images]
         debug_label = tk.Label(img_window, 
                               text=f"Phases captured: {', '.join(phases_captured)}", 

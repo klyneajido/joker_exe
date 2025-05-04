@@ -1,4 +1,5 @@
 import time
+from collections import Counter
 
 class UserStats:
     """Tracks and analyzes user behavior during the simulation"""
@@ -16,6 +17,7 @@ class UserStats:
         self.help_used = 0
         self.story_viewed = 0
         self.unique_commands = set()
+        self.emotions = []
         
     def log_command(self, command):
         """Log a command used by the user"""
@@ -54,6 +56,13 @@ class UserStats:
         stage_time = current_time - self.current_stage_start
         self.time_per_stage[stage] = stage_time
         self.current_stage_start = current_time
+    
+    def log_emotion(self, emotion):
+        """Log detected facial emotion"""
+        self.emotions.append({
+            'emotion': emotion,
+            'timestamp': time.time()
+        })
     
     def get_elapsed_time(self):
         """Get total elapsed time in seconds"""
@@ -100,6 +109,19 @@ class UserStats:
         help_penalty = min(3, self.help_used * 0.6)
         return min(10, max(1, base_score - hint_penalty - help_penalty))
     
+    def get_emotion_summary(self):
+        """Generate a summary of detected emotions"""
+        if not self.emotions:
+            return "No emotions detected.\n"
+        
+        emotion_counts = Counter(emotion['emotion'] for emotion in self.emotions)
+        total = sum(emotion_counts.values())
+        summary = "Emotion Analysis:\n"
+        for emotion, count in emotion_counts.items():
+            percentage = (count / total) * 100
+            summary += f"{emotion.capitalize()}: {count} times ({percentage:.1f}%)\n"
+        return summary
+    
     def get_stats_report(self):
         """Generate a comprehensive stats report"""
         elapsed_time = self.get_elapsed_time()
@@ -130,6 +152,8 @@ Efficiency: {efficiency:.1f}/10
 Curiosity: {curiosity:.1f}/10
 Adaptability: {adaptability:.1f}/10
 
+{self.get_emotion_summary()}
+
 You rank in the top {percentile}% of participants.
 """
         if self.time_per_stage:
@@ -141,19 +165,12 @@ You rank in the top {percentile}% of participants.
         return report
     
     def log_event(self, event_type, details=None):
-        """Log a general user event with timestamp
-        
-        Args:
-            event_type: Type of event (e.g., 'riddle_solved', 'game_started')
-            details: Optional dictionary with additional event details
-        """
+        """Log a general user event with timestamp"""
         if details is None:
             details = {}
         
-        # For now, just print the event for debugging
         print(f"Event logged: {event_type}")
         
-        # We could store events in the future if needed
         if not hasattr(self, 'events'):
             self.events = []
         
