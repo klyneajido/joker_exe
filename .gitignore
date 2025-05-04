@@ -2,3 +2,6 @@ venv
 .env
 build
 dist
+*.pyc
+*.log
+__pycache__

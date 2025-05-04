@@ -139,3 +139,26 @@ You rank in the top {percentile}% of participants.
                 report += f"Stage {stage}: {minutes}m {seconds}s\n"
         
         return report
+    
+    def log_event(self, event_type, details=None):
+        """Log a general user event with timestamp
+        
+        Args:
+            event_type: Type of event (e.g., 'riddle_solved', 'game_started')
+            details: Optional dictionary with additional event details
+        """
+        if details is None:
+            details = {}
+        
+        # For now, just print the event for debugging
+        print(f"Event logged: {event_type}")
+        
+        # We could store events in the future if needed
+        if not hasattr(self, 'events'):
+            self.events = []
+        
+        self.events.append({
+            'type': event_type,
+            'timestamp': time.time(),
+            'details': details
+        })

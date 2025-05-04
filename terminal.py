@@ -58,7 +58,7 @@ class PowerShellTerminal:
         self.terminal_text.tag_configure("prompt", foreground="#FFFF00")
         self.terminal_text.tag_configure("response", foreground="#FFFFFF")
         self.terminal_text.tag_configure("error", foreground="#FF0000")
-        self.terminal_text.tag_configure("success", foreground="#00FF00")
+        self.terminal_text.tag_configure("success", foreground="#FFFFFF")
 
         self.terminal_text.bind("<Return>", self.handle_return)
         self.terminal_text.bind("<Key>", self.handle_key)
@@ -121,7 +121,7 @@ class PowerShellTerminal:
             message = "This is your final warning. I’m tracing you now. Next time, you’re done.\n"
             self.animate_text(message, "error", callback=lambda: [self.play_weird_sound(), self.show_fake_retrieval_window(), resume_previous_message()])
         else:
-            message = "You keep testing me, huh? Damn it, you might just be the one I need...\n"
+            message = "You keep testing me, huh? DON'T FUCKING TRY ME ASSHOLE!\n"
             self.animate_text(message, "error", callback=lambda: [
                 self.root.after(2000, lambda: self.animate_text(
                     "The answers lie within the puzzles. Look closer.\n", 
@@ -140,16 +140,151 @@ class PowerShellTerminal:
     
     def show_fake_retrieval_window(self):
         retrieval_window = tk.Toplevel(self.root)
-        retrieval_window.title("Data Retrieval In Progress")
-        retrieval_window.geometry("300x200")
+        retrieval_window.title("SYSTEM BREACH - DATA EXTRACTION")
+        retrieval_window.geometry("400x300")
         retrieval_window.configure(bg='#000')
         retrieval_window.attributes('-topmost', True)
         
-        label = tk.Label(retrieval_window, text="Retrieving system data...\nIP: 192.168.x.x\nMAC: xx:xx:xx:xx:xx:xx\nUser: [REDACTED]", 
-                        fg="#FF0000", bg="#000", font=('Consolas', 10))
-        label.pack(pady=20)
+        # Add a red border to make it look more alarming
+        retrieval_window.configure(highlightbackground="red", highlightcolor="red", highlightthickness=2)
         
-        self.root.after(3000, retrieval_window.destroy)
+        # Create a flashing effect
+        def flash_window():
+            current_bg = retrieval_window.cget("bg")
+            new_bg = "#300" if current_bg == "#000" else "#000"
+            retrieval_window.configure(bg=new_bg)
+            if retrieval_window.winfo_exists():
+                retrieval_window.after(300, flash_window)
+        
+        # Start flashing
+        flash_window()
+        
+        # Get real IP and hostname for added realism
+        import socket
+        try:
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
+        except:
+            hostname = "UNKNOWN"
+            ip = "192.168.x.x"
+        
+        # Generate a fake but realistic-looking MAC address
+        import random
+        mac = ":".join([f"{random.randint(0, 255):02x}" for _ in range(6)])
+        
+        # Create a header with warning icon
+        header_label = tk.Label(
+            retrieval_window, 
+            text="⚠ UNAUTHORIZED ACCESS DETECTED ⚠",
+            fg="#FF0000", 
+            bg="#000", 
+            font=('Consolas', 12, 'bold')
+        )
+        header_label.pack(pady=(10, 5))
+        
+        # Create a progress bar
+        progress_frame = tk.Frame(retrieval_window, bg="#000")
+        progress_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        progress_var = tk.DoubleVar()
+        progress_bar = tk.Canvas(
+            progress_frame, 
+            width=360, 
+            height=20, 
+            bg="#000", 
+            highlightbackground="#333", 
+            highlightthickness=1
+        )
+        progress_bar.pack()
+        
+        # Animate the progress bar
+        def update_progress(value=0):
+            if value <= 100:
+                progress_bar.delete("progress")
+                width = 3.6 * value
+                progress_bar.create_rectangle(
+                    0, 0, width, 20, 
+                    fill="#FF0000", 
+                    tags="progress"
+                )
+                progress_var.set(value)
+                
+                # Update status text based on progress
+                if value < 30:
+                    status_label.config(text=f"Accessing system files... {value}%")
+                elif value < 60:
+                    status_label.config(text=f"Extracting user data... {value}%")
+                elif value < 90:
+                    status_label.config(text=f"Downloading personal files... {value}%")
+                else:
+                    status_label.config(text=f"Establishing remote control... {value}%")
+                    
+                if retrieval_window.winfo_exists():
+                    retrieval_window.after(50, update_progress, value + random.uniform(1, 3))
+            else:
+                status_label.config(text="Remote access established")
+                data_label.config(text=f"HOST: {hostname}\nIP: {ip}\nMAC: {mac}\nUSER: {os.getlogin()}\nACCESS: FULL CONTROL")
+                
+                # Play a beep when complete
+                if platform.system() == "Windows":
+                    winsound.Beep(800, 200)
+                    winsound.Beep(600, 200)
+        
+        # Status label that changes with progress
+        status_label = tk.Label(
+            retrieval_window, 
+            text="Initializing connection...", 
+            fg="#FF0000", 
+            bg="#000", 
+            font=('Consolas', 10)
+        )
+        status_label.pack(pady=5)
+        
+        # Data display that updates when "complete"
+        data_label = tk.Label(
+            retrieval_window, 
+            text="SCANNING SYSTEM...", 
+            fg="#FF0000", 
+            bg="#000", 
+            font=('Consolas', 10, 'bold'),
+            justify=tk.LEFT
+        )
+        data_label.pack(pady=10)
+        
+        # Start the progress animation
+        update_progress()
+        
+        # Add a countdown timer
+        countdown_label = tk.Label(
+            retrieval_window, 
+            text="Window closing in 5s", 
+            fg="#888", 
+            bg="#000", 
+            font=('Consolas', 8)
+        )
+        countdown_label.pack(side=tk.BOTTOM, pady=5)
+        
+        def update_countdown(seconds=5):
+            if seconds > 0:
+                countdown_label.config(text=f"Window closing in {seconds}s")
+                if retrieval_window.winfo_exists():
+                    retrieval_window.after(1000, update_countdown, seconds - 1)
+        
+        # Start the countdown
+        update_countdown()
+        
+        # Try to log this event, but don't fail if the method doesn't exist
+        try:
+            if hasattr(self.user_stats, 'log_event'):
+                self.user_stats.log_event('fake_retrieval_shown')
+            else:
+                # Increment close attempts as a fallback
+                self.user_stats.close_attempts += 1
+        except Exception as e:
+            print(f"Error logging event: {str(e)}")
+        
+        # Close the window after 5 seconds
+        self.root.after(5000, retrieval_window.destroy)
     
     def start_webcam_capture_thread(self):
         def capture_images():
