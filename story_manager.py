@@ -1,5 +1,4 @@
 import os
-from utils import text_to_morse, text_to_binary
 
 class StoryManager:
     """Manages the story progression, riddles, and clues"""
@@ -10,7 +9,6 @@ class StoryManager:
         self.discovered_clues = []
         self.hearts = 3
         
-        # Define a coherent theme for riddles - digital/tech/hacking
         self.riddles = {
             0: {
                 "riddle": "I show you yourself, but I'm not you. What am I?",
@@ -45,7 +43,6 @@ class StoryManager:
             self.hearts -= 1
         
         self.terminal.user_stats.log_wrong_answer()
-        self.terminal.capture_webcam_snapshot("wrong_answer")
         
         error_message = f"Wrong! Damn it, that's not it. Lives left: {self.hearts}\n"
         
@@ -53,7 +50,7 @@ class StoryManager:
             if self.hearts <= 0:
                 self.story_stage = -1
                 self.terminal.animate_text("You're out of lives. But this isn't the end—something's off.\n", "error", 
-                                        callback=self.terminal.reveal_truth)
+                                callback=self.terminal.reveal_truth)
             else:
                 self.terminal.insert_prompt()
                 
@@ -61,9 +58,7 @@ class StoryManager:
     
     def advance_story(self, stage):
         """Advance the story to a specific stage"""
-        self.terminal.user_stats.log_stage_complete(stage)
-        self.terminal.capture_webcam_snapshot("correct_answer")
-        
+        self.terminal.user_stats.log_stage_complete(self.story_stage)
         self.story_stage = stage
         
         story_segments = {
@@ -75,28 +70,23 @@ I've planted clues for you to find. Each one brings you closer to the truth.
 Next riddle: {self.riddles[1]['riddle']}
 """,
             1: f"""
-Well played. Morse code - the original digital language.
 Check your Downloads folder for a file called 'cipher.txt'.
 The file contains an encrypted message. Decrypt it to proceed.
 
 Next riddle: {self.riddles[2]['riddle']}
 """,
             2: f"""
-Power. The force that drives all digital systems.
 You're proving yourself worthy of the next challenge.
-
-Next riddle: {self.riddles[3]['riddle']}
+Now enter this command exactly: DECRYPT_FIREWALL
 """,
             3: f"""
-Firewall breached. You've penetrated the first layer of security.
 I've left another file in your Downloads folder. Find 'shadow.bin'.
 It contains a binary message that will lead you further.
 
 Next riddle: {self.riddles[4]['riddle']}
 """,
             4: f"""
-Silence. The absence of signal.
-You've reached the final barrier.
+Silence - the absence of signal. You've reached the final barrier.
 Prepare for the truth to be unveiled...
 """
         }
@@ -104,18 +94,40 @@ Prepare for the truth to be unveiled...
         if stage in story_segments:
             self.terminal.animate_text(story_segments[stage], "success", callback=self.terminal.insert_prompt)
             
-            if stage == 1:
-                morse_message = text_to_morse("The next answer is POWER")
+            if stage == 0:
+                self.story_stage = 1
+            elif stage == 1:
+                morse_message = self.text_to_morse("The next answer is POWER")
                 self.create_hidden_clue("cipher.txt", f"MORSE CODE CIPHER:\n\n{morse_message}\n\nDecode to proceed.")
+                self.story_stage = 2
+            elif stage == 2:
+                self.story_stage = 3
             elif stage == 3:
-                binary_message = text_to_binary("The final answer is SILENCE")
-                self.create_hidden_clue("shadow.bin", f"BINARY MESSAGE:\n\n{binary_message}\n\nDecode to continue.")
-            elif stage == 5:
-                self.story_stage = 6
-                self.terminal.capture_webcam_snapshot("final_reveal")
+                binary_message = self.text_to_binary("The final answer is SILENCE")
+                self.create_hidden_clue("shadow.bin", f"BINARY MESSAGE:\n\n{binary_message}\n\nDecode to proceed.")
+                self.story_stage = 4
+            elif stage == 4:
+                self.story_stage = 5
                 self.terminal.reveal_final_truth()
         else:
             self.terminal.insert_prompt()
+    
+    def text_to_morse(self, text):
+        """Convert text to Morse code"""
+        morse_dict = {
+            'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.', 
+            'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..', 
+            'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.', 
+            'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-', 
+            'Y': '-.--', 'Z': '--..', '0': '-----', '1': '.----', '2': '..---', 
+            '3': '...--', '4': '....-', '5': '.....', '6': '-....', '7': '--...', 
+            '8': '---..', '9': '----.', ' ': '/'
+        }
+        return ' '.join(morse_dict.get(c.upper(), '') for c in text)
+    
+    def text_to_binary(self, text):
+        """Convert text to binary"""
+        return ' '.join(format(ord(c), '08b') for c in text)
     
     def create_hidden_clue(self, filename, content):
         """Create a hidden clue file in the Downloads folder"""
@@ -128,7 +140,7 @@ Prepare for the truth to be unveiled...
             self.discovered_clues.append(filepath)
             self.terminal.discovered_clues.append(filepath)
         except Exception as e:
-            firmself.terminal.animate_text(f"Error creating {filename}: {str(e)}\n", "error")
+            self.terminal.animate_text(f"Error creating {filename}: {str(e)}\n", "error")
     
     def show_story_progress(self):
         """Display the current story progress"""
@@ -137,10 +149,9 @@ Prepare for the truth to be unveiled...
         else:
             message = f"""
 Current Progress:
-- Story Stage: {self.story_stage}/7
+- Story Stage: {self.story_stage}/5
 - Clues Found: {len(self.terminal.discovered_clues)}/{max(1, self.story_stage-1)}
 - Close Attempts: {self.terminal.close_attempts}
-- Captured Images: {len(self.terminal.captured_images)}/5
 
 Keep pushing. The truth is near.\n
 """
@@ -153,6 +164,5 @@ Keep pushing. The truth is near.\n
         if 0 <= self.story_stage < len(self.riddles):
             hint = self.riddles[self.story_stage]['hint']
             self.terminal.animate_text(f"🔮 Hint: {hint}\n", callback=self.terminal.insert_prompt)
-            self.terminal.capture_webcam_snapshot("hint_request")
         else:
             self.terminal.animate_text("No hints at this point.\n", callback=self.terminal.insert_prompt)
