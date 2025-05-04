@@ -15,6 +15,14 @@ from story_manager import StoryManager
 from deepface import DeepFace
 import numpy as np
 
+# Add this if you're on Windows to enable title bar customization
+if platform.system() == "Windows":
+    try:
+        import ctypes
+        from ctypes import windll, byref, sizeof, c_int
+    except ImportError:
+        print("DEBUG: Could not import ctypes for title bar customization")
+
 SAFE_WORD = "EXITNOW"
 KILL_CODE = "LORMA"
 exit_flag = threading.Event()
@@ -22,14 +30,43 @@ exit_flag = threading.Event()
 EXE_PATH = [sys.executable, os.path.abspath(__file__)]
 
 class PowerShellTerminal:
-    def __init__(self, title="Command Line Terminal"):
+    def __init__(self, title="Windows PowerShell"):
         self.root = tk.Tk()
-        self.root.title(title)
+        
+        # Set title to match Command Prompt style
+        self.root.title("Command Prompt")
+        
+        # Set window appearance
         self.root.geometry("800x600")
-        self.root.configure(bg='#000')
+        self.root.configure(bg='#0C0C0C')
         self.root.focus_force()
         self.root.protocol("WM_DELETE_WINDOW", self.prevent_close)
-
+        
+        # Change icon to a system icon (alternative approach)
+        try:
+            # Try to use a built-in Windows icon
+            if platform.system() == "Windows":
+                # Use the Command Prompt icon
+                self.root.iconbitmap(default="cmd.exe")
+                print("DEBUG: Using system Command Prompt icon")
+            else:
+                print("DEBUG: System icon setting only supported on Windows")
+        except Exception as e:
+            print(f"DEBUG: Could not set system icon: {str(e)}")
+        
+        # Make the window look more like a system window
+        if platform.system() == "Windows":
+            try:
+                # Try to use system appearance
+                self.root.attributes("-alpha", 0.98)  # Slight transparency
+                self.root.attributes("-topmost", True)  # Initially on top
+                self.root.after(2000, lambda: self.root.attributes("-topmost", False))  # Then allow to go behind
+            except:
+                pass
+        
+        # Apply dark title bar if on Windows
+        self.apply_dark_title_bar()
+        
         self.story_stage = 0
         self.discovered_clues = []
         self.close_attempts = 0
@@ -40,14 +77,15 @@ class PowerShellTerminal:
         self.main_frame = tk.Frame(self.root, bg='#000')
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-        self.scrollbar = tk.Scrollbar(self.main_frame)
+        # Custom styled scrollbar
+        self.scrollbar = tk.Scrollbar(self.main_frame, width=12, troughcolor='#1A1A1A', bg='#333333', activebackground='#555555')
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.terminal_text = tk.Text(
             self.main_frame,
-            bg='#000',
-            fg='#FFFFFF',
-            insertbackground='#FFFFFF',
+            bg='#0C0C0C',
+            fg='#CCCCCC',
+            insertbackground='#CCCCCC',
             font=('Consolas', 12),
             wrap=tk.WORD,
             borderwidth=0,
@@ -57,10 +95,10 @@ class PowerShellTerminal:
         self.terminal_text.pack(fill=tk.BOTH, expand=True)
         self.scrollbar.config(command=self.terminal_text.yview)
         
-        self.terminal_text.tag_configure("prompt", foreground="#FFFF00")
-        self.terminal_text.tag_configure("response", foreground="#FFFFFF")
-        self.terminal_text.tag_configure("error", foreground="#FF0000")
-        self.terminal_text.tag_configure("success", foreground="#FFFFFF")
+        self.terminal_text.tag_configure("prompt", foreground="#1BC4F6")  # Bright blue for prompt
+        self.terminal_text.tag_configure("response", foreground="#CCCCCC")
+        self.terminal_text.tag_configure("error", foreground="#FF6666")  # Softer red for errors
+        self.terminal_text.tag_configure("success", foreground="#CCCCCC")
 
         self.terminal_text.bind("<Return>", self.handle_return)
         self.terminal_text.bind("<Key>", self.handle_key)
@@ -424,7 +462,7 @@ class PowerShellTerminal:
             if line > 1 and col > 0:
                 self.terminal_text.insert(tk.END, "\n")
                 
-            self.terminal_text.insert(tk.END, "PS C:\\Users\\User> ", "prompt")
+            self.terminal_text.insert(tk.END, "C:\\Users\\User> ", "prompt")
             self.current_input_line = self.terminal_text.index(tk.INSERT)
             self.terminal_text.see(tk.END)
         self.input_enabled = True
@@ -801,45 +839,24 @@ All data is anonymous and used only for analysis.
         
         self.start_time = time.time()
 
+        # Enhanced terminal header with more authentic PowerShell styling
         welcome_message = """
-Windows PowerShell
-Copyright (C) Microsoft Corporation. All rights reserved.
-
-Try the new cross-platform PowerShell https://aka.ms/pscore6
-
+Microsoft Windows [Version 10.0.22631.5189]
+(c) Microsoft Corporation. All rights reserved.
 """
         with self.text_lock:
             self.terminal_text.insert(tk.END, welcome_message)
+        
+        # Configure additional text styling for better terminal appearance
+        self.terminal_text.tag_configure("system", foreground="#AAAAAA")
+        self.terminal_text.tag_configure("header", foreground="#FFFFFF", font=('Consolas', 12, 'bold'))
+        self.terminal_text.tag_configure("warning", foreground="#FFA500")
         
         intro_message = """Greetings.
 
 Pay close attention to what I’m about to say.
 Take a moment to focus and consider this carefully.
 You don’t know me, but I know you—better than you think.
-
-We're about to discuss a deal between you and me, and I don't play games.
-Well, you've been a bit careless lately, scrolling through those videos and clicking on links, stumbling upon some not-so-safe sites.
-
-I actually placed a Malware on a porn website & you visited it to watch (you know what I mean).
-
-And when you got busy enjoying those videos, your system started working as a RDP (Remote Protocol) which provided me complete control over your device.
-
-I can peep at everything on your screen, switch on your camera and mic, and you won't even notice.
-
-Simply a single click, I can send this garbage to all of your contacts. HAHAHAHAHA.
-
-Yeah, Yeah, I've got footage of you doing embarrassing things in your room.
-
-Your confusion is clear, but don't expect sympathy. I will give you two alternatives.
-
-First Option is to ignore my message.
-
-You should know what will happen if you choose this option. I will send your video to all of your contacts. The video is straight fire, and I can't even fathom the humiliation you'll endure when your colleagues, friends, and fam check it out. But hey, that's life, ain't it? Don't be playing the victim here.
-There’s no easy way out. Try to leave, and you’ll see what happens.
-
-Option 2 is to play a game.
-
-Let's see what happens if you choose this option. Your filthy secret remains private. I will wipe everything clean once you solve the riddles correctly.
 
 Let’s begin.
 
@@ -868,3 +885,19 @@ Lives: 3 | Type 'help' for commands
         self.animate_text("Terminal Enigma - Shutting Down. Farewell.\n", "success")
         self.root.after(1500, lambda: self.root.quit())
         self.root.after(1600, lambda: sys.exit(0))
+    
+    def apply_dark_title_bar(self):
+        """Apply dark title bar on Windows 10+"""
+        if platform.system() == "Windows":
+            try:
+                # Check if Windows 10 or higher
+                if int(platform.version().split('.')[0]) >= 10:
+                    DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+                    set_window_attribute = windll.dwmapi.DwmSetWindowAttribute
+                    hwnd = self.root.winfo_id()
+                    rendering_policy = c_int(2)
+                    value = c_int(1)  # 1 for dark mode, 0 for light mode
+                    set_window_attribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, byref(value), sizeof(value))
+                    print("DEBUG: Applied dark title bar")
+            except Exception as e:
+                print(f"DEBUG: Failed to set dark title bar: {str(e)}")

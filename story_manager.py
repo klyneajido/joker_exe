@@ -55,7 +55,17 @@ class StoryManager:
             if self.hearts <= 0:
                 self.story_stage = -1
                 self.terminal.animate_text("You're out of lives. But this isn't the end—something's off.\n", "error", 
-                                callback=self.terminal.reveal_truth)
+                            callback=self.terminal.reveal_truth)
+            elif self.hearts == 1:
+                # Play scream sound when only 1 life remains
+                try:
+                    import pygame
+                    pygame.mixer.init()
+                    pygame.mixer.music.load("scream.mp3")
+                    pygame.mixer.music.play()
+                except Exception as e:
+                    print(f"DEBUG: Error playing scream sound: {str(e)}")
+                self.terminal.insert_prompt()
             else:
                 self.terminal.insert_prompt()
                 
