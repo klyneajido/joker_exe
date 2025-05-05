@@ -1,4 +1,5 @@
 import os
+from resource_helper import resource_path, play_sound
 
 class StoryManager:
     """Manages the story progression, riddles, and clues"""
@@ -58,13 +59,7 @@ class StoryManager:
                             callback=self.terminal.reveal_truth)
             elif self.hearts == 1:
                 # Play scream sound when only 1 life remains
-                try:
-                    import pygame
-                    pygame.mixer.init()
-                    pygame.mixer.music.load("scream.mp3")
-                    pygame.mixer.music.play()
-                except Exception as e:
-                    print(f"DEBUG: Error playing scream sound: {str(e)}")
+                play_sound("scream.mp3")
                 self.terminal.insert_prompt()
             else:
                 self.terminal.insert_prompt()

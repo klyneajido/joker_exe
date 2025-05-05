@@ -9,9 +9,10 @@ import argparse
 from PIL import Image, ImageTk
 import pygame
 from datetime import datetime
+from resource_helper import resource_path, play_sound
 
 class MinimalPhotoViewer:
-    def __init__(self, root, captured_images=None):
+    def __init__(self, root):
         # Initialize main window
         self.root = root
         self.root.title("Terminal Enigma")
@@ -46,29 +47,9 @@ class MinimalPhotoViewer:
         # Simple header
         self.create_header()
         
-        # Simple two-panel layout
-        self.content_frame = ttk.Frame(self.main_frame, style='TFrame')
-        self.content_frame.pack(fill=tk.BOTH, expand=True, pady=10)
-        
-        # Left panel for thumbnails
-        self.gallery_panel = ttk.Frame(self.content_frame, style='Panel.TFrame')
-        self.gallery_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10), pady=0, ipadx=10, ipady=10)
-        
-        gallery_label = tk.Label(
-            self.gallery_panel,
-            text="Gallery",
-            font=('Helvetica', 12, 'bold'),
-            bg=self.colors["bg_panel"],
-            fg=self.colors["text_primary"]
-        )
-        gallery_label.pack(pady=(10, 15))
-        
-        self.gallery_content = ttk.Frame(self.gallery_panel, style='Panel.TFrame')
-        self.gallery_content.pack(fill=tk.BOTH, expand=True)
-        
-        # Right panel for webcam
-        self.webcam_panel = ttk.Frame(self.content_frame, style='Panel.TFrame')
-        self.webcam_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=0, pady=0, ipadx=10, ipady=10)
+        # Webcam panel
+        self.webcam_panel = ttk.Frame(self.main_frame, style='Panel.TFrame')
+        self.webcam_panel.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         webcam_header = tk.Label(
             self.webcam_panel,
@@ -96,16 +77,10 @@ class MinimalPhotoViewer:
         # Prepare cat window
         self.cat_window = None
         
-        # Load captured images if provided
-        self.captured_photos = []
-        if captured_images:
-            self.load_captured_images(captured_images)
-        else:
-            self.check_for_observation_photos()
-        
         # Start webcam
         self.cap = cv2.VideoCapture(0)
         self.webcam_active = True
+        self.placeholder_shown = False
         self.webcam_thread = threading.Thread(target=self.update_webcam, daemon=True)
         self.webcam_thread.start()
         
@@ -142,91 +117,66 @@ class MinimalPhotoViewer:
         self.time_label.config(text=datetime.now().strftime("%H:%M:%S"))
         self.root.after(1000, self.update_clock)
 
-    def load_captured_images(self, image_paths):
-        """Load and display thumbnails in a simple list"""
-        # Clear existing content
-        for widget in self.gallery_content.winfo_children():
-            widget.destroy()
-        
-        for img_path in image_paths:
-            try:
-                # Create a frame for each thumbnail
-                thumb_frame = ttk.Frame(self.gallery_content, style='Panel.TFrame')
-                thumb_frame.pack(fill=tk.X, pady=5, padx=5)
-                
-                # Load and resize image
-                img = Image.open(img_path) if os.path.exists(img_path) else Image.new('RGB', (100, 75), color='gray')
-                img.thumbnail((120, 90), Image.Resampling.LANCZOS)
-                photo = ImageTk.PhotoImage(img)
-                
-                # Store reference
-                self.captured_photos.append(photo)
-                
-                # Display thumbnail
-                img_label = tk.Label(
-                    thumb_frame, 
-                    image=photo, 
-                    bg=self.colors["bg_panel"],
-                    bd=1,
-                    relief=tk.SOLID
-                )
-                img_label.pack(pady=2)
-                
-                # Simple label for the image name
-                phase_name = os.path.basename(img_path).replace("observation_", "").replace(".jpg", "")
-                phase_name = phase_name.replace("_", " ").title()
-                
-                name_label = tk.Label(
-                    thumb_frame,
-                    text=phase_name,
-                    font=('Helvetica', 9),
-                    bg=self.colors["bg_panel"],
-                    fg=self.colors["text_secondary"]
-                )
-                name_label.pack()
-                
-            except Exception as e:
-                print(f"Error loading image {img_path}: {str(e)}")
-
     def update_webcam(self):
         """Simple webcam update without effects"""
         while self.webcam_active:
-            ret, frame = self.cap.read()
-            if ret:
-                # Convert to RGB
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                
-                # Convert to PIL Image
-                img = Image.fromarray(frame_rgb)
-                
-                # Resize to fit display area
-                img = img.resize((640, 480), Image.Resampling.LANCZOS)
-                
-                # Create photo image
-                photo = ImageTk.PhotoImage(img)
-                
-                # Update label
-                self.webcam_label.config(image=photo)
-                self.webcam_label.image = photo
-                
+            try:
+                ret, frame = self.cap.read()
+                if ret and frame is not None and not frame.size == 0:
+                    # Convert to RGB
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    
+                    # Convert to PIL Image
+                    img = Image.fromarray(frame_rgb)
+                    
+                    # Resize to fit display area
+                    img = img.resize((640, 480), Image.Resampling.LANCZOS)
+                    
+                    # Create photo image
+                    photo = ImageTk.PhotoImage(img)
+                    
+                    # Update label
+                    self.webcam_label.config(image=photo)
+                    self.webcam_label.image = photo
+                    self.placeholder_shown = False
+                else:
+                    # If webcam fails, show a placeholder
+                    if not self.placeholder_shown:
+                        self.placeholder_shown = True
+                        self.webcam_label.config(text="Webcam not available", 
+                                               font=('Arial', 18), fg='black',
+                                               bg=self.colors["bg_panel"])
+            except Exception as e:
+                print(f"Error in webcam update: {str(e)}")
+                # If error occurs, show a placeholder
+                if not self.placeholder_shown:
+                    self.placeholder_shown = True
+                    self.webcam_label.config(text="Webcam error", 
+                                           font=('Arial', 18), fg='black',
+                                           bg=self.colors["bg_panel"])
+                    
             time.sleep(0.03)  # ~30 FPS
 
     def show_cat_with_laugh(self):
-        """Simple cat popup with laugh sound"""
+        """Cat popup with looping laugh sound"""
         try:
-            # Play laugh sound
-            if os.path.exists("laugh.mp3"):
-                pygame.mixer.music.load("laugh.mp3")
-                pygame.mixer.music.play(loops=-1)  # Loop indefinitely
+            # Play laugh sound on loop
+            sound_path = resource_path("laugh.mp3")
+            pygame.mixer.music.load(sound_path)
+            pygame.mixer.music.play(-1)  # -1 means loop indefinitely
             
             # Show cat image if exists
-            if os.path.exists("cat.png"):
-                # Create a simple window
+            cat_path = resource_path("cat.png")
+            if os.path.exists(cat_path):
+                # Create a simple window without title bar
                 self.cat_window = tk.Toplevel(self.root)
                 self.cat_window.title("Surprise")
                 self.cat_window.geometry("300x250")
                 self.cat_window.configure(bg=self.colors["bg_panel"])
                 self.cat_window.attributes('-topmost', True)  # Keep on top
+                
+                # Remove title bar
+                self.cat_window.overrideredirect(True)
                 
                 # Center the window
                 window_width = self.root.winfo_width()
@@ -240,8 +190,8 @@ class MinimalPhotoViewer:
                 cat_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
                 
                 # Load and display cat image
-                cat_img = Image.open("cat.png")
-                cat_img = cat_img.resize((250, 180), Image.Resampling.LANCZOS)
+                cat_img = Image.open(cat_path)
+                cat_img = cat_img.resize((250, 180), Image.LANCZOS)
                 photo = ImageTk.PhotoImage(cat_img)
                 
                 cat_label = tk.Label(
@@ -261,21 +211,11 @@ class MinimalPhotoViewer:
                     fg=self.colors["accent"]
                 )
                 message_label.pack(pady=5)
+                
+                # Don't close cat window when clicked
+                self.cat_window.protocol("WM_DELETE_WINDOW", lambda: None)
         except Exception as e:
             print(f"Error in show_cat_with_laugh: {str(e)}")
-
-    def check_for_observation_photos(self):
-        """Check for observation photos"""
-        observation_paths = []
-        phases = ["game_start", "correct_answer", "wrong_answer", "final_reveal"]
-        
-        for phase in phases:
-            potential_path = f"observation_{phase}.jpg"
-            if os.path.exists(potential_path):
-                observation_paths.append(potential_path)
-        
-        if observation_paths:
-            self.load_captured_images(observation_paths)
 
     def on_close(self):
         """Clean up on close"""
@@ -294,12 +234,16 @@ class MinimalPhotoViewer:
 
 def main():
     parser = argparse.ArgumentParser(description='Minimal Photo Viewer')
-    parser.add_argument('--images', nargs='*', help='List of image paths')
+    # We'll keep the --images argument for compatibility, but we won't use it
+    parser.add_argument('--images', nargs='+', help='List of image files to display (ignored)')
     args = parser.parse_args()
     
     root = tk.Tk()
-    app = MinimalPhotoViewer(root, args.images)
+    app = MinimalPhotoViewer(root)
     root.mainloop()
 
 if __name__ == "__main__":
     main()
+
+
+

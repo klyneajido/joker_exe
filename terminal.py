@@ -14,6 +14,7 @@ from user_stats import UserStats
 from story_manager import StoryManager
 from deepface import DeepFace
 import numpy as np
+from resource_helper import resource_path, play_sound
 
 # Add this if you're on Windows to enable title bar customization
 if platform.system() == "Windows":
@@ -373,9 +374,10 @@ class PowerShellTerminal:
                 print(f"DEBUG: Error in capture_images thread: {str(e)}")
         
         threading.Thread(target=capture_images, daemon=True).start()
-    
+        
     def detect_emotion(self, frame):
         try:
+            # Let DeepFace handle its own weights
             result = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
             if isinstance(result, list):
                 result = result[0]
@@ -384,7 +386,6 @@ class PowerShellTerminal:
         except Exception as e:
             print(f"DEBUG: Error in emotion detection: {str(e)}")
             return None
-    
     def capture_image(self, cap, phase):
         try:
             for attempt in range(3):

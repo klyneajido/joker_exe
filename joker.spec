@@ -2,76 +2,67 @@
 import os
 import sys
 import tensorflow
-import tkinter
+import cv2
 import PyInstaller.config
-
-# Find Tcl/Tk directories - more robust approach
-try:
-    import tkinter
-    tcl_dir = os.path.dirname(tkinter.__file__)
-    tcl8_dir = os.path.join(tcl_dir, 'tcl8')
-    tk8_dir = os.path.join(tcl_dir, 'tk8')
-    
-    # Check if directories exist, otherwise try alternative paths
-    if not os.path.exists(tcl8_dir):
-        # Try to find tcl directory in a different location
-        base_dir = os.path.dirname(os.path.dirname(tcl_dir))
-        tcl8_dir = os.path.join(base_dir, 'tcl', 'tcl8.6')
-        tk8_dir = os.path.join(base_dir, 'tcl', 'tk8.6')
-        
-        # If still not found, try another common location
-        if not os.path.exists(tcl8_dir):
-            import _tkinter
-            tcl_root = os.path.dirname(_tkinter.__file__)
-            tcl8_dir = os.path.join(tcl_root, 'tcl8.6')
-            tk8_dir = os.path.join(tcl_root, 'tk8.6')
-except Exception as e:
-    print(f"Warning: Could not find Tcl/Tk directories: {e}")
-    tcl8_dir = None
-    tk8_dir = None
-
-# Find TensorFlow directories
-tf_dir = os.path.dirname(tensorflow.__file__)
-tf_keras_dir = None
-try:
-    # Try to find keras directory
-    if os.path.exists(os.path.join(tf_dir, 'keras')):
-        tf_keras_dir = os.path.join(tf_dir, 'keras')
-    elif hasattr(tensorflow, 'keras') and hasattr(tensorflow.keras, '__file__'):
-        tf_keras_dir = os.path.dirname(tensorflow.keras.__file__)
-    
-    print(f"TensorFlow directory: {tf_dir}")
-    print(f"TensorFlow Keras directory: {tf_keras_dir}")
-except Exception as e:
-    print(f"Warning: Could not find TensorFlow Keras directory: {e}")
 
 PyInstaller.config.CONF['distpath'] = os.path.abspath('./dist')
 
 block_cipher = None
 
+# Get OpenCV path and binary
+opencv_dir = os.path.dirname(cv2.__file__)
+binaries = []
+# Add OpenCV binary explicitly to avoid extraction issues
+binaries.append((os.path.join(opencv_dir, 'cv2.pyd'), '.'))
+
 # Prepare datas list
 datas = [
-    # Include resource files
     ('laugh.mp3', '.'),
     ('cat.png', '.'),
     ('photo_viewer.py', '.'),
     ('scream.mp3', '.'),
+    ('weights/facial_expression_model_weights.h5', 'weights'),  # Specific model file
+    ('weights/*', 'weights'),  # Other DeepFace weights
+    (os.path.join(opencv_dir, 'data'), 'cv2/data'),  # OpenCV data
 ]
 
-# Add TensorFlow data files if found
-if tf_keras_dir and os.path.exists(tf_keras_dir):
+# Add TensorFlow and Tcl/Tk data
+tf_dir = os.path.dirname(tensorflow.__file__)
+tf_keras_dir = os.path.join(tf_dir, 'keras') if os.path.exists(os.path.join(tf_dir, 'keras')) else None
+if tf_keras_dir:
     datas.append((tf_keras_dir, 'tensorflow/keras'))
 
-# Add Tcl/Tk data files if found
-if tcl8_dir and os.path.exists(tcl8_dir):
-    datas.append((tcl8_dir, 'tcl8'))
-if tk8_dir and os.path.exists(tk8_dir):
-    datas.append((tk8_dir, 'tk8'))
+# Fix Tcl/Tk path detection
+try:
+    import tkinter
+    import os
+    tcl_dir = os.path.dirname(tkinter.__file__)
+    tcl8_dir = os.path.join(tcl_dir, 'tcl8')
+    tk8_dir = os.path.join(tcl_dir, 'tk8')
+    if not os.path.exists(tcl8_dir):
+        import _tkinter
+        tcl_tk_dir = os.path.dirname(_tkinter.__file__)
+        tcl8_dir = os.path.join(tcl_tk_dir, 'tcl8.6')
+        tk8_dir = os.path.join(tcl_tk_dir, 'tk8.6')
+    
+    # If still not found, try Python's DLLs directory
+    if not os.path.exists(tcl8_dir):
+        python_dir = os.path.dirname(os.path.dirname(tcl_dir))
+        tcl8_dir = os.path.join(python_dir, 'tcl', 'tcl8.6')
+        tk8_dir = os.path.join(python_dir, 'tcl', 'tk8.6')
+    
+    if os.path.exists(tcl8_dir) and os.path.exists(tk8_dir):
+        datas.append((tcl8_dir, 'tcl8.6'))
+        datas.append((tk8_dir, 'tk8.6'))
+    else:
+        print(f"Warning: Could not find Tcl/Tk directories")
+except Exception as e:
+    print(f"Warning: Could not find Tcl/Tk directories: {e}")
 
 a = Analysis(
-    ['main.py'],  # Main entry point
+    ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries,  # Add the binaries we defined above
     datas=datas,
     hiddenimports=[
         'PIL', 
@@ -94,20 +85,16 @@ a = Analysis(
         'deepface.models.Race',
         'deepface.models.Emotion',
         'deepface.models.Facial_Attributes',
+        'deepface.basemodels',
+        'deepface.extendedmodels',
+        'deepface.commons.functions',
+        'deepface.commons.distance',
         'pygame',
         'numpy',
         'tensorflow',
-        'tensorflow.python',
-        'tensorflow.python.keras',
-        'tensorflow.python.keras.engine',
-        'tensorflow.python.keras.layers',
-        'tensorflow.python.keras.models',
-        'tensorflow.python.keras.utils',
-        'tensorflow.python.keras.wrappers',
-        'tensorflow.python.keras.applications',
-        'tensorflow.python.keras.preprocessing',
-        'tensorflow.python.feature_column',
-        'tensorflow.python.layers',
+        'pandas',
+        'gdown',
+        'tqdm',
         'requests',
         'user_stats',
         'story_manager',
@@ -142,7 +129,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,  # Set to True to see error messages during testing
+    console=True,  # Keep console for debugging
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
